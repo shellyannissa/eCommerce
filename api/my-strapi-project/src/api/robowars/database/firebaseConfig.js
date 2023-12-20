@@ -5,12 +5,12 @@ const { initializeApp } = require("firebase/app");
 const { getDatabase } = require("firebase/database");
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCY7v8bHzt6qvcZzp2g0hAeR-XJf0RejZg",
-  authDomain: "chat-app-4d401.firebaseapp.com",
-  projectId: "chat-app-4d401",
-  storageBucket: "chat-app-4d401.appspot.com",
-  messagingSenderId: "208186499870",
-  appId: "1:208186499870:web:dfa85d667aa0cdcae6df0f",
+  apiKey: process.env.RW_API_KEY,
+  authDomain: process.env.RW_AUTH_DOMAIN,
+  projectId: process.env.RW_PROJECT_ID,
+  storageBucket: process.env.RW_STORAGE_BUCKET,
+  messagingSenderId: process.env.RW_MESSAGING_SENDER_ID,
+  appId: process.env.RW_APP_ID,
 };
 
 // Initialize Firebase

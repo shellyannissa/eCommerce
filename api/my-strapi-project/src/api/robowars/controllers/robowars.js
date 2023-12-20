@@ -200,7 +200,7 @@ module.exports = {
   getLeaderboard: async (ctx, next) => {
     try {
       ctx.body = await service.extendPoints(ctx.request.body.quizId);
-      //! time has to be set after checking with frontend
+      // //! time has to be set after checking with frontend
       setTimeout(() => {
         service.getLeaderBoard(ctx.request.body.quizId);
       }, 5000);

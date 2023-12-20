@@ -32,6 +32,7 @@ module.exports = {
     const now = new Date();
     const allottedMin = questionSnapshot.val().allottedMin;
     const allottedSec = questionSnapshot.val().allottedSec;
+    const quizId = questionSnapshot.val().quizId;
     const endingInstant = addMinutesAndSeconds(
       now.toISOString(),
       allottedMin,
@@ -57,10 +58,13 @@ module.exports = {
     };
     const displayRef = ref(db, "display");
     set(displayRef, postContent);
+    let quizQnRef = ref(db, `quiz/${quizId}/questions/${qnId}`);
+    set(quizQnRef, "active");
     setTimeout(() => {
       set(displayRef, {
         type: "None",
       });
+      set(quizQnRef, "timedOut");
     }, seconds * 1000);
     return { qnId };
   },
@@ -87,7 +91,7 @@ module.exports = {
             (endingInstant.getTime() - answeredInstant.getTime()) /
             (endingInstant.getTime() - startingInstant.getTime());
           // @ts-ignore
-          const points = parseInt(weightage * ratio);
+          const points = ratio > 0 ? parseInt(weightage * ratio) : 0;
           console.log(points);
           const updates = {
             points: increment(points),
@@ -119,7 +123,8 @@ module.exports = {
       console.error("Error fetching or updating data:", error);
       throw new Error(error);
     }
-
+    const quizQnRef = ref(db, `quiz/${quizId}/questions/${qnId}`);
+    set(quizQnRef, "evaluated");
     return quizId;
   },
   questionStats: async (qnId) => {
@@ -158,61 +163,66 @@ module.exports = {
   extendPoints: async (quizId) => {
     const prevLeadRef = ref(db, "prevLead");
     let snapshot = await get(prevLeadRef);
-    let entries = snapshot.val();
-    entries = entries.map(async (entry) => {
-      const userId = entry.userId;
-      const regRef = ref(db, `reg/${quizId}/${userId}`);
-      const snapshot = await get(regRef);
-      const newPoints = snapshot.val().points;
-      const userRef = ref(db, `user/${userId}`);
-      const snapshot2 = await get(userRef);
-      const userName = snapshot2.val().userName;
-      return {
-        userId,
-        points: newPoints,
-        userName,
+    if (snapshot.exists()) {
+      let entries = snapshot.val();
+      entries = entries.map(async (entry) => {
+        const userId = entry.userId;
+        const regRef = ref(db, `reg/${quizId}/${userId}`);
+        const snapshot = await get(regRef);
+        const newPoints = snapshot.val().points;
+        const userRef = ref(db, `user/${userId}`);
+        const snapshot2 = await get(userRef);
+        const userName = snapshot2.val().userName;
+        return {
+          userId,
+          points: newPoints,
+          userName,
+        };
+      });
+      entries = await Promise.all(entries);
+      const postContent = {
+        type: "extend",
+        data: entries,
       };
-    });
-    entries = await Promise.all(entries);
-    const postContent = {
-      type: "extend",
-      data: entries,
-    };
-    const displayRef = ref(db, "display");
-    set(displayRef, postContent);
-    return quizId;
+      const displayRef = ref(db, "display");
+      set(displayRef, postContent);
+    }
+    return { quizId };
   },
   getLeaderBoard: async (quizId) => {
     const regRef = ref(db, `reg/${quizId}`);
     const snapshot = await get(regRef);
-    const data = snapshot.val();
-    let orderedEntries = Object.entries(data).sort(
-      (a, b) => b[1].points - a[1].points
-    );
-    orderedEntries = orderedEntries.slice(0, 10);
-    // @ts-ignore
-    orderedEntries = orderedEntries.map(async (entry) => {
-      const [userId, userData] = entry;
-      const userRef = ref(db, `user/${userId}`);
-      const snapshot = await get(userRef);
-      const userInfo = snapshot.val();
-      return {
-        userId,
-        userName: userInfo.userName,
-        avatar: userInfo.avatar,
-        points: userData.points,
-        position: userData.position,
+
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      let orderedEntries = Object.entries(data).sort(
+        (a, b) => b[1].points - a[1].points
+      );
+      orderedEntries = orderedEntries.slice(0, 10);
+      // @ts-ignore
+      orderedEntries = orderedEntries?.map(async (entry) => {
+        const [userId, userData] = entry;
+        const userRef = ref(db, `user/${userId}`);
+        const snapshot = await get(userRef);
+        const userInfo = snapshot.val();
+        return {
+          userId,
+          userName: userInfo.userName,
+          avatar: userInfo.avatar,
+          points: userData.points,
+          position: userData.position,
+        };
+      });
+      orderedEntries = await Promise.all(orderedEntries);
+      const postContent = {
+        type: "lead",
+        data: orderedEntries,
       };
-    });
-    orderedEntries = await Promise.all(orderedEntries);
-    const postContent = {
-      type: "lead",
-      data: orderedEntries,
-    };
-    const displayRef = ref(db, "display");
-    set(displayRef, postContent);
-    const prevLeadRef = ref(db, "prevLead");
-    set(prevLeadRef, orderedEntries);
+      const displayRef = ref(db, "display");
+      set(displayRef, postContent);
+      const prevLeadRef = ref(db, "prevLead");
+      set(prevLeadRef, orderedEntries);
+    }
     return { quizId };
   },
   userStanding: async (userId, quizId) => {
@@ -232,4 +242,5 @@ module.exports = {
     };
     return postContent;
   },
+  initLead: async (quizId) => {},
 };
